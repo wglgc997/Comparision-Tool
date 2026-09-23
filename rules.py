@@ -101,16 +101,187 @@ _RULE_INDEX = [
     ),
 ]
 
-CHECKPOINT_RULES = [
-    {
+_RULE_DETAILS = {
+    2: {
+        "expected": "Product stack text should follow the standard format.",
+        "logic": (
+            "If the product stack text uses the correct format, pass. "
+            "Otherwise, fail."
+        ),
+        "why_it_matters": (
+            "Correct formatting improves readability and consistency."
+        ),
+    },
+    3: {
+        "expected": (
+            "Specifications should begin with Processor, followed by "
+            "Operating System. MDF-compliant specifications and the "
+            "remaining specifications may follow."
+        ),
+        "logic": (
+            "If the specification sequence matches the standard, pass. "
+            "Otherwise, fail."
+        ),
+        "why_it_matters": (
+            "A consistent sequence makes products easier to read and compare."
+        ),
+    },
+    4: {
+        "expected": (
+            "Processor information should be present as the first line item "
+            "in the product stack."
+        ),
+        "logic": (
+            "If Processor is present, pass. "
+            "If Processor is missing, fail."
+        ),
+        "why_it_matters": (
+            "Processor is a key specification users rely on to evaluate "
+            "performance and compare products."
+        ),
+    },
+    5: {
+        "expected": (
+            "Operating System should be present as a key line item "
+            "in the product stack."
+        ),
+        "logic": (
+            "If Operating System is present, pass. "
+            "If Operating System is missing, fail."
+        ),
+        "why_it_matters": (
+            "Operating System affects compatibility, usability, and "
+            "the purchase decision."
+        ),
+    },
+    6: {
+        "expected": (
+            "Graphics information should be present as a key line item "
+            "in the product stack."
+        ),
+        "logic": (
+            "If Graphics is present, pass. "
+            "If Graphics is missing or replaced, fail."
+        ),
+        "why_it_matters": (
+            "Graphics information helps customers evaluate performance "
+            "for gaming, design, and video workloads."
+        ),
+    },
+    8: {
+        "expected": (
+            "Storage information, such as SSD or HDD capacity, should be "
+            "present as a key line item in the product stack."
+        ),
+        "logic": (
+            "If Storage is present, pass. "
+            "If Storage is missing or replaced, fail."
+        ),
+        "why_it_matters": (
+            "Storage capacity affects how much data users can store and "
+            "influences their purchase decision."
+        ),
+    },
+    9: {
+        "expected": (
+            "Display information, including size, resolution, and type, "
+            "should be present as a key line item in the product stack."
+        ),
+        "logic": (
+            "If Display is present, pass. "
+            "If Display is missing or replaced, fail."
+        ),
+        "why_it_matters": (
+            "Display size, resolution, and clarity are key buying factors."
+        ),
+    },
+    10: {
+        "expected": (
+            "Only one display option should appear in the product stack."
+        ),
+        "logic": (
+            "If exactly one display option is shown, pass. "
+            "If multiple display options are shown, fail."
+        ),
+        "why_it_matters": (
+            "Multiple display values can confuse customers and misrepresent "
+            "the displayed configuration."
+        ),
+    },
+    13: {
+        "expected": (
+            "The product title should match the approved naming standard "
+            "and the product-detail page source of truth."
+        ),
+        "logic": (
+            "If the product title matches the source of truth, pass. "
+            "If it is missing, inconsistent, or incorrect, fail."
+        ),
+        "why_it_matters": (
+            "The product title supports correct product identification and "
+            "comparison. An incorrect title can mislead customers."
+        ),
+    },
+    15: {
+        "expected": (
+            "The delivery date should be today or a future date."
+        ),
+        "logic": (
+            "If the delivery date is today or later, pass. "
+            "If the delivery date is in the past, fail."
+        ),
+        "why_it_matters": (
+            "Incorrect delivery dates can mislead customers and affect "
+            "purchase decisions."
+        ),
+    },
+    16: {
+        "expected": (
+            "The delivery date should be no more than 30 days from "
+            "the current date."
+        ),
+        "logic": (
+            "If the delivery date is within 30 days, pass. "
+            "If it is more than 30 days away, fail."
+        ),
+        "why_it_matters": (
+            "Unrealistic delivery timelines create a poor customer "
+            "experience and may cause customers to abandon a purchase."
+        ),
+    },
+}
+
+def _build_rule(rule_id, category, checkpoint):
+    """Build one rule dictionary from its inventory and available details."""
+    details = _RULE_DETAILS.get(rule_id, {})
+
+    expected = details.get("expected")
+    logic = details.get("logic")
+    why_it_matters = details.get("why_it_matters")
+
+    has_complete_details = all(
+        value is not None
+        for value in (expected, logic, why_it_matters)
+    )
+
+    return {
         "id": rule_id,
         "category": category,
         "checkpoint": checkpoint,
-        "expected": None,
-        "logic": None,
-        "why_it_matters": None,
+        "expected": expected,
+        "logic": logic,
+        "why_it_matters": why_it_matters,
         "severity": None,
-        "status": "needs_rule_details",
+        "status": (
+            "documented"
+            if has_complete_details
+            else "needs_rule_details"
+        ),
     }
+
+
+CHECKPOINT_RULES = [
+    _build_rule(rule_id, category, checkpoint)
     for rule_id, category, checkpoint in _RULE_INDEX
 ]
+
