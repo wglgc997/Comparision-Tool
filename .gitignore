@@ -5,9 +5,6 @@ venv/
 # IDE
 .idea/
 
-# Agent file
-AGENT.md
-
 # Python cache
 __pycache__/
 *.pyc
