@@ -60,3 +60,38 @@ def compare_specs(source_specs, live_specs):
         )
 
     return results
+
+
+def get_summary(results):
+    """
+    Summarize comparison results.
+
+    The score is the percentage of checkpoints that passed. Empty results
+    receive a NO DATA status because no comparison was performed.
+    """
+    total = len(results)
+    passed = sum(
+        result["status"] == "PASS"
+        for result in results
+    )
+    failed = total - passed
+
+    score = round(
+        (passed / total) * 100,
+        2,
+    ) if total else 0.0
+
+    if total == 0:
+        overall_status ="NO DATA"
+    elif failed == 0:
+        overall_status = "PASS"
+    else:
+        overall_status = "FAIL"
+
+    return {
+        "total": total,
+        "passed": passed,
+        "failed": failed,
+        "score": score,
+        "overall_status": overall_status,
+    }
