@@ -178,6 +178,21 @@ _RULE_DETAILS = {
             "for gaming, design, and video workloads."
         ),
     },
+
+    7: {
+        "expected": (
+            "Memory information, including capacity and type, should be "
+            "present as a key line item in the product stack."
+        ),
+        "logic": (
+            "If Memory is present and displays the expected specification, "
+            "pass. If Memory is missing, replaced, or inaccurate, fail."
+    ),
+    "why_it_matters": (
+        "Memory capacity and type affect system performance and are "
+        "important factors when customers compare products."
+    ),
+},
     8: {
         "expected": (
             "Storage information, such as SSD or HDD capacity, should be "
