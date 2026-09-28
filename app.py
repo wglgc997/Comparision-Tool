@@ -23,14 +23,39 @@ st.markdown(
 st.markdown("___")
 
 # ── Main Area (placeholder) ──
-st.info(
-    "🚧 **Tool under construction...**\n\n"
-    "This tool will help auditors compare:\n"
-    "- **Source data** (Excel/CSV) — e.g., "
-    "OfferReadiness audit spreadsheet\n"
-    "- **Live PDP page** specs\n\n"
-    "Using **59 checkpoint validation rules**"
+st.subheader("Manual Spec Comparison")
+st.caption(
+    "Enter one specification per line using the format "
+    "`Checkpoint: Value`."
 )
+
+source_column, live_column = st.columns(2)
+
+with source_column:
+    st.markdown("#### Source Specifications")
+    source_text = st.text_area(
+        "Source specifications",
+        height=300,
+        placeholder=(
+            "Processor: Intel Core Ultra 7\n"
+            "Memory: 16GB DDR5\n"
+            "Storage: 512GB SSD"
+        ),
+        label_visibility="collapsed",
+    )
+
+with live_column:
+    st.markdown("#### Live PDP Specifications")
+    live_text = st.text_area(
+        "Live PDP specifications",
+        height=300,
+        placeholder=(
+            "Processor: Intel Core Ultra 7\n"
+            "Memory: 32GB DDR5\n"
+            "Storage: 512GB SSD"
+        ),
+        label_visibility="collapsed",
+    )
 
 # ── Sidebar (placeholder) ──
 with st.sidebar:
