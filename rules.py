@@ -594,6 +594,22 @@ _RULE_DETAILS = {
             "problems and support electrical safety and compliance."
         ),
     },
+
+    36: {
+        "expected": (
+            "Packaging should display only labels approved for the "
+            "selected country or region."
+        ),
+        "logic": (
+            "If all packaging labels match the selected region, pass. "
+            "If an incorrect or unapproved regional label appears, fail."
+        ),
+        "why_it_matters": (
+            "Correct regional packaging supports regulatory compliance "
+            "and prevents products from being shipped with incorrect labels."
+        ),
+    },
+
     43: {
         "expected": (
             "A Base Warranty option should be displayed in the services "
@@ -972,3 +988,27 @@ CHECKPOINT_RULES = [
     for rule_id, category, checkpoint in _RULE_INDEX
 ]
 
+def get_all_rules():
+    """Return a shallow copy of the complete rule inventory."""
+    return CHECKPOINT_RULES.copy()
+
+def get_by_category(category):
+    """Return rules matching a category, ignoring letter case."""
+    normalized_category = category.strip().casefold()
+
+    return [
+        rule
+        for rule in CHECKPOINT_RULES
+        if rule ["category"].casefold() == normalized_category
+    ]
+
+def get_by_severity(severity):
+    """Return rules matching a severity, ignoring letter case."""
+    normalized_severity = severity.strip().casefold()
+
+    return [
+        rule
+        for rule in CHECKPOINT_RULES
+        if rule["severity"] is not None
+        and rule ["severity"].casefold() == normalized_severity
+    ]
