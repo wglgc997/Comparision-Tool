@@ -2,6 +2,7 @@
 Comparison Engine
 Compares source specs (Excel) against live specs (PDP page).
 """
+from jsonschema.benchmarks.const_vs_enum import value
 
 
 def normalize(value):
@@ -27,6 +28,34 @@ def normalize(value):
         return ""
 
     return normalized
+
+def parse_specs(text):
+    """
+    Parse lines in 'Checkpoint: Value' format into a dictionary.
+
+    Blank lines, lines without a colon, and lines without a checkpoint name
+    are ignored. Only the first colon separates the checkpoint from its value.
+    """
+    if not text:
+        return {}
+
+    specs = {}
+
+    for line in text.splitlines():
+        stripped_line = line.strip()
+
+        if not stripped_line or ":" not in stripped_line:
+            continue
+
+        checkpoint, value = stripped_line.split(":",1)
+        checkpoint = checkpoint.strip()
+
+        if not checkpoint:
+            continue
+
+        specs[checkpoint] = value.strip()
+
+    return specs
 
 
 def compare_specs(source_specs, live_specs):
