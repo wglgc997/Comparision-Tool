@@ -86,12 +86,22 @@ if compare_clicked:
 
         summary = get_summary(comparison_results)
 
-        st.markdown("### Comparison Results")
-        st.dataframe(
-            comparison_results,
-            use_container_width=True,
-            hide_index=True,
-        )
+        overall_status = summary["overall_status"]
+
+        if overall_status == "PASS":
+            st.success(
+                "Overall Status: PASS - all specifications match."
+            )
+        elif overall_status == "FAIL":
+            st.error(
+                "Overall Status: FAIL - one or more specifications "
+                "do not match."
+            )
+        else:
+            st.info(
+                "Overall Status: NO DATA - no specifications "
+                "were compared"
+            )
 
         total_column, passed_column, failed_column, score_column = (
             st.columns(4)
@@ -107,14 +117,19 @@ if compare_clicked:
         )
         failed_column.metric(
             "Failed",
-            summary["failed"]
+            summary["failed"],
         )
         score_column.metric(
             "Score",
             f"{summary['score']:.2f}%",
         )
 
-
+        st.markdown("### Comparison Results")
+        st.dataframe(
+            comparison_results,
+            use_container_width=True,
+            hide_index=True,
+        )
 
 # ── Sidebar (placeholder) ──
 with st.sidebar:
