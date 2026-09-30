@@ -1,0 +1,105 @@
+import unittest
+
+from comparison import compare_specs, get_summary, normalize
+
+
+class NormalizeTests(unittest.TestCase):
+    def test_normalizes_case_and_whitespace(self):
+        value = "  Intel   Core ULTRA 7  "
+
+        self.assertEqual(
+            normalize(value),
+            "intel core ultra 7",
+        )
+
+    def test_normalizes_missing_values(self):
+        self.assertEqual(normalize(None), "")
+        self.assertEqual(normalize(float("nan")), "")
+
+    def test_normalizes_non_string_value(self):
+        self.assertEqual(normalize(16), "16")
+
+
+class CompareSpecsTests(unittest.TestCase):
+    def test_compares_offer_specs(self):
+        source_specs = {
+            "Processor": "Intel Core Ultra 7",
+            "Memory": "16GB DDR5",
+            "Graphics": "Intel Integrated Graphics",
+        }
+        live_specs = {
+            " processor ": "intel  core ultra 7",
+            "Memory": "32GB DDR5",
+        }
+
+        results = compare_specs(source_specs, live_specs)
+
+        self.assertEqual(
+            [result["status"] for result in results],
+            ["PASS", "FAIL", "FAIL"],
+        )
+        self.assertEqual(results[2]["actual"], "")
+
+    def test_preserves_original_values(self):
+        source_specs = {
+            "Display": "14-inch FHD",
+        }
+        live_specs = {
+            "display": "  14-INCH FHD  ",
+        }
+
+        result = compare_specs(source_specs, live_specs)[0]
+
+        self.assertEqual(result["expected"], "14-inch FHD")
+        self.assertEqual(result["actual"], "  14-INCH FHD  ")
+        self.assertEqual(result["status"], "PASS")
+
+    def test_empty_source_returns_no_results(self):
+        self.assertEqual(compare_specs({}, {}), [])
+
+
+class SummaryTests(unittest.TestCase):
+    def test_summarizes_mixed_results(self):
+        results = [
+            {"status": "PASS"},
+            {"status": "FAIL"},
+            {"status": "PASS"},
+        ]
+
+        self.assertEqual(
+            get_summary(results),
+            {
+                "total": 3,
+                "passed": 2,
+                "failed": 1,
+                "score": 66.67,
+                "overall_status": "FAIL",
+            },
+        )
+
+    def test_summarizes_all_passed_results(self):
+        summary = get_summary(
+            [
+                {"status": "PASS"},
+                {"status": "PASS"},
+            ]
+        )
+
+        self.assertEqual(summary["score"], 100.0)
+        self.assertEqual(summary["overall_status"], "PASS")
+
+    def test_summarizes_empty_results(self):
+        self.assertEqual(
+            get_summary([]),
+            {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "score": 0.0,
+                "overall_status": "NO DATA",
+            },
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
