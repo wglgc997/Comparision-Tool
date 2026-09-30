@@ -6,7 +6,7 @@ Run with: streamlit run app.py
 import streamlit as st
 
 from rules import get_all_rules, get_by_category
-from comparison import compare_specs, parse_specs
+from comparison import compare_specs, parse_specs, get_summary
 
 #Page config
 st.set_page_config(
@@ -84,12 +84,36 @@ if compare_clicked:
             live_specs,
         )
 
+        summary = get_summary(comparison_results)
+
         st.markdown("### Comparison Results")
         st.dataframe(
             comparison_results,
             use_container_width=True,
             hide_index=True,
         )
+
+        total_column, passed_column, failed_column, score_column = (
+            st.columns(4)
+        )
+
+        total_column.metric(
+            "Total",
+            summary["total"],
+        )
+        passed_column.metric(
+            "Passed",
+            summary["passed"],
+        )
+        failed_column.metric(
+            "Failed",
+            summary["failed"]
+        )
+        score_column.metric(
+            "Score",
+            f"{summary['score']:.2f}%",
+        )
+
 
 
 # ── Sidebar (placeholder) ──
