@@ -6,8 +6,8 @@ Run with: streamlit run app.py
 import pandas as pd
 import streamlit as st
 
+from comparison import compare_specs, get_summary, parse_specs
 from rules import get_all_rules, get_by_category
-from comparison import compare_specs, parse_specs, get_summary
 
 #Page config
 st.set_page_config(
@@ -15,6 +15,9 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide",
 )
+
+if "comparison_results" not in st.session_state:
+    st.session_state["comparison_results"] = None
 
 #Header
 st.title("🔍 Offer Readiness QA Tool")
@@ -70,81 +73,89 @@ if compare_clicked:
     live_specs = parse_specs(live_text)
 
     if not source_specs:
+        st.session_state["comparison_results"] = None
         st.warning(
             "Enter at least one valid source specification using "
-            " `Checkpoint: Value`."
+            "`Checkpoint: Value`."
         )
     elif not live_specs:
+        st.session_state["comparison_results"] = None
         st.warning(
             "Enter at least one valid live specification using "
             "`Checkpoint: Value`."
         )
     else:
-        comparison_results = compare_specs(
+        st.session_state["comparison_results"] = compare_specs(
             source_specs,
             live_specs,
         )
 
-        summary = get_summary(comparison_results)
+comparison_results = st.session_state["comparison_results"]
 
-        overall_status = summary["overall_status"]
+if comparison_results is not None:
+    summary = get_summary(comparison_results)
+    result_dataframe = pd.DataFrame(comparison_results)
 
-        if overall_status == "PASS":
-            st.success(
-                "Overall Status: PASS - all specifications match."
-            )
-        elif overall_status == "FAIL":
-            st.error(
-                "Overall Status: FAIL - one or more specifications "
-                "do not match."
-            )
-        else:
-            st.info(
-                "Overall Status: NO DATA - no specifications "
-                "were compared"
-            )
+    overall_status = summary["overall_status"]
 
-        total_column, passed_column, failed_column, score_column = (
-            st.columns(4)
+    if overall_status == "PASS":
+        st.success(
+            "Overall Status: PASS - all specifications match."
         )
-        result_dataframe = pd.DataFrame(comparison_results)
-
-
-        total_column.metric(
-            "Total",
-            summary["total"],
+    elif overall_status == "FAIL":
+        st.error(
+            "Overall Status: FAIL - one or more specifications "
+            "do not match."
         )
-        passed_column.metric(
-            "Passed",
-            summary["passed"],
-        )
-        failed_column.metric(
-            "Failed",
-            summary["failed"],
-        )
-        score_column.metric(
-            "Score",
-            f"{summary['score']:.2f}%",
+    else:
+        st.info(
+            "Overall Status: NO DATA - no specifications were compared."
         )
 
-        st.markdown("### Comparison Results")
-        st.dataframe(
-            result_dataframe,
-            use_container_width=True,
-            hide_index=True,
-        )
+    total_column, passed_column, failed_column, score_column = (
+        st.columns(4)
+    )
 
-        csv_data = result_dataframe.to_csv(
-            index=False,
-        ).encode("utf-8")
+    total_column.metric("Total", summary["total"])
+    passed_column.metric("Passed", summary["passed"])
+    failed_column.metric("Failed", summary["failed"])
+    score_column.metric(
+        "Score",
+        f"{summary['score']:.2f}%",
+    )
 
-        st.download_button(
-            label="Download Results as CSV",
-            data=csv_data,
-            file_name="results.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+    st.markdown("### Comparison Results")
+    st.dataframe(
+        result_dataframe,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    csv_data = result_dataframe.to_csv(
+        index=False,
+    ).encode("utf-8")
+
+    st.download_button(
+        label="Download Results as CSV",
+        data=csv_data,
+        file_name="results.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+st.markdown("---")
+st.subheader("Upload Source File")
+st.caption(
+    "Upload an Offer Readiness CSV or Excel file, "
+    "then select an Offer ID."
+)
+
+uploaded_file = st.file_uploader(
+    "Choose a source file",
+    type=["csv", "xlsx"],
+    help="Supported formats: CSV and XLSX.",
+)
+
 # ── Sidebar (placeholder) ──
 with st.sidebar:
     st.header("Settings")
@@ -197,3 +208,98 @@ with st.sidebar:
 
             if rule["notes"]:
                 st.info(rule["notes"])
+
+if uploaded_file is not None:
+    try:
+        uploaded_file.seek(0)
+
+        if uploaded_file.name.lower().endswith(".csv"):
+            uploaded_dataframe = pd.read_csv(uploaded_file)
+        else:
+            uploaded_dataframe = pd.read_excel(uploaded_file)
+
+    except Exception as error:
+        st.error(
+            f"Could not read the uploaded file: {error}"
+        )
+    else:
+        normalized_columns = {
+            "".join(
+                character
+                for character in str(column).casefold()
+                if character.isalnum()
+            ): column
+            for column in uploaded_dataframe.columns
+        }
+
+        offer_id_column = normalized_columns.get("offerid")
+
+        if offer_id_column is None:
+            st.error(
+                "The uploaded file does not contain an Offer ID column."
+            )
+            st.caption(
+                "Available columns: "
+                + ", ".join(
+                    str(column)
+                    for column in uploaded_dataframe.columns
+                )
+            )
+        else:
+            offer_ids = (
+                uploaded_dataframe[offer_id_column]
+                .dropna()
+                .astype(str)
+                .str.strip()
+            )
+            offer_ids = sorted(
+                offer_id
+                for offer_id in offer_ids.unique()
+                if offer_id
+            )
+
+            if not offer_ids:
+                st.warning(
+                    "The Offer ID column does not contain any values."
+                )
+            else:
+                selected_offer_id = st.selectbox(
+                    "Select an Offer ID",
+                    options=offer_ids,
+                )
+
+                st.success(
+                    f"Loaded {len(uploaded_dataframe)} rows and "
+                    f"found {len(offer_ids)} unique Offer IDs."
+                )
+
+
+                offer_id_values = (
+                    uploaded_dataframe[offer_id_column]
+                    .astype("string")
+                    .str.strip()
+                )
+
+                selected_offer_mask = (
+                    offer_id_values
+                    .eq(selected_offer_id)
+                    .fillna(False)
+                )
+
+                filtered_offer_dataframe = (
+                    uploaded_dataframe.loc[selected_offer_mask]
+                    .copy()
+                )
+
+                st.markdown("### Selected Offer Data")
+                st.caption(
+                    f"Offer `{selected_offer_id}` contains "
+                    f"{len(filtered_offer_dataframe)} row(s)."
+                )
+
+                st.dataframe(
+                    filtered_offer_dataframe,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
