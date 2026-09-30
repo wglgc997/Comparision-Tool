@@ -6,6 +6,7 @@ Run with: streamlit run app.py
 import streamlit as st
 
 from rules import get_all_rules, get_by_category
+from comparison import compare_specs, parse_specs
 
 #Page config
 st.set_page_config(
@@ -56,6 +57,40 @@ with live_column:
         ),
         label_visibility="collapsed",
     )
+
+compare_clicked = st.button(
+    "Compare Specifications",
+    type="primary",
+    use_container_width=True,
+)
+
+if compare_clicked:
+    source_specs = parse_specs(source_text)
+    live_specs = parse_specs(live_text)
+
+    if not source_specs:
+        st.warning(
+            "Enter at least one valid source specification using "
+            " `Checkpoint: Value`."
+        )
+    elif not live_specs:
+        st.warning(
+            "Enter at least one valid live specification using "
+            "`Checkpoint: Value`."
+        )
+    else:
+        comparison_results = compare_specs(
+            source_specs,
+            live_specs,
+        )
+
+        st.markdown("### Comparison Results")
+        st.dataframe(
+            comparison_results,
+            use_container_width=True,
+            hide_index=True,
+        )
+
 
 # ── Sidebar (placeholder) ──
 with st.sidebar:
