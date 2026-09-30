@@ -3,6 +3,7 @@ Offer Readiness QA Tool — Main GUI
 Run with: streamlit run app.py
 """
 
+import pandas as pd
 import streamlit as st
 
 from rules import get_all_rules, get_by_category
@@ -106,6 +107,8 @@ if compare_clicked:
         total_column, passed_column, failed_column, score_column = (
             st.columns(4)
         )
+        result_dataframe = pd.DataFrame(comparison_results)
+
 
         total_column.metric(
             "Total",
@@ -126,11 +129,22 @@ if compare_clicked:
 
         st.markdown("### Comparison Results")
         st.dataframe(
-            comparison_results,
+            result_dataframe,
             use_container_width=True,
             hide_index=True,
         )
 
+        csv_data = result_dataframe.to_csv(
+            index=False,
+        ).encode("utf-8")
+
+        st.download_button(
+            label="Download Results as CSV",
+            data=csv_data,
+            file_name="results.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 # ── Sidebar (placeholder) ──
 with st.sidebar:
     st.header("Settings")
