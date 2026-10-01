@@ -5,6 +5,7 @@ Run with: streamlit run app.py
 
 import pandas as pd
 import streamlit as st
+from setuptools import namespaces
 
 from comparison import compare_specs, get_summary, parse_specs
 from rules import get_all_rules, get_by_category
@@ -286,10 +287,140 @@ if uploaded_file is not None:
                     .fillna(False)
                 )
 
-                filtered_offer_dataframe = (
+                offer_dataframe = (
                     uploaded_dataframe.loc[selected_offer_mask]
                     .copy()
                 )
+
+                country_column = normalized_columns.get("country")
+                checkpoint_column = normalized_columns.get("checkpoint")
+                expected_column = normalized_columns.get(
+                    "expectedformatrule"
+                )
+
+                required_columns = {
+                    "Country": country_column,
+                    "Checkpoint": checkpoint_column,
+                    "Expected Format / Rule": expected_column,
+                }
+                missing_columns = [
+                    name
+                    for name, column in required_columns.items()
+                    if column is None
+                ]
+
+                if missing_columns:
+                    st.error(
+                        "The uploaded file is missing required columns: "
+                        + ", ".join(missing_columns)
+                    )
+                else:
+                    countries = (
+                        offer_dataframe[country_column]
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
+                    )
+                    countries = sorted(
+                        country
+                        for country in countries.unique()
+                        if country
+                    )
+
+                    if not countries:
+                        st.warning(
+                            "The selected Offer ID has no country values."
+                        )
+                    else:
+                        selected_country = st.selectbox(
+                            "Select a Country / Market",
+                            options=countries,
+                        )
+
+                        country_values = (
+                            offer_dataframe[country_column]
+                            .astype("string")
+                            .str.strip()
+                        )
+                        selected_country_mask = (
+                            country_values
+                            .eq(selected_country)
+                            .fillna(False)
+                        )
+
+                        filtered_offer_dataframe = (
+                            offer_dataframe.loc[
+                                selected_offer_mask
+                            ]
+                            .copy()
+                        )
+
+                        st.markdown("### Selected Offer Data")
+                        st.caption(
+                            f"Offer `{selected_offer_id}`in"
+                            f"`{selected_country}' contains "
+                            f"`{len(filtered_offer_dataframe)} row(s)."
+                        )
+                        st.dataframe(
+                            filtered_offer_dataframe,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                        uploaded_source_specs = {}
+
+                        for _, row in (
+                            filtered_offer_dataframe.iterrows()
+                        ):
+                            checkpoint = row[checkpoint_column]
+                            expected = row[expected_column]
+
+                            if (
+                                pd.isna(checkpoint)
+                                or pd.isna(expected)
+                            ):
+                                continue
+
+                            checkpoint = str(checkpoint).strip()
+                            expected = str(expected).strip()
+
+                            if checkpoint and expected:
+                                uploaded_source_specs[checkpoint] = (
+                                    expected
+                                )
+
+                        if not uploaded_source_specs:
+                            st.warning(
+                                "The selected offer and market have no "
+                                "complete Checkpoint and Expected Format "
+                                "/ Rule values to compare."
+                            )
+                        else:
+                            st.success(
+                                f"Extracted "
+                                f"{len(uploaded_source_specs)} source"
+                                f"specification(s)."
+                            )
+
+                            source_preview = pd.DataFrame(
+                                [
+                                    {
+                                        "checkpoint": checkpoint,
+                                        "expected": expected,
+                                    }
+                                    for checkpoint, expected
+                                    in uploaded_source_specs.items()
+                                ]
+                            )
+
+                            st.markdown(
+                                "### Extracted Source Specifications"
+                            )
+                            st.dataframe(
+                                source_preview,
+                                use_container_width=True,
+                                hide_index=True,
+                            )
 
                 st.markdown("### Selected Offer Data")
                 st.caption(
