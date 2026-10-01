@@ -3,8 +3,11 @@ Offer Readiness QA Tool — Main GUI
 Run with: streamlit run app.py
 """
 
+import pandas as pd
 import streamlit as st
+from setuptools import namespaces
 
+from comparison import compare_specs, get_summary, parse_specs
 from rules import get_all_rules, get_by_category
 
 #Page config
@@ -13,6 +16,9 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide",
 )
+
+if "comparison_results" not in st.session_state:
+    st.session_state["comparison_results"] = None
 
 #Header
 st.title("🔍 Offer Readiness QA Tool")
@@ -23,13 +29,132 @@ st.markdown(
 st.markdown("___")
 
 # ── Main Area (placeholder) ──
-st.info(
-    "🚧 **Tool under construction...**\n\n"
-    "This tool will help auditors compare:\n"
-    "- **Source data** (Excel/CSV) — e.g., "
-    "OfferReadiness audit spreadsheet\n"
-    "- **Live PDP page** specs\n\n"
-    "Using **59 checkpoint validation rules**"
+st.subheader("Manual Spec Comparison")
+st.caption(
+    "Enter one specification per line using the format "
+    "`Checkpoint: Value`."
+)
+
+source_column, live_column = st.columns(2)
+
+with source_column:
+    st.markdown("#### Source Specifications")
+    source_text = st.text_area(
+        "Source specifications",
+        height=300,
+        placeholder=(
+            "Processor: Intel Core Ultra 7\n"
+            "Memory: 16GB DDR5\n"
+            "Storage: 512GB SSD"
+        ),
+        label_visibility="collapsed",
+    )
+
+with live_column:
+    st.markdown("#### Live PDP Specifications")
+    live_text = st.text_area(
+        "Live PDP specifications",
+        height=300,
+        placeholder=(
+            "Processor: Intel Core Ultra 7\n"
+            "Memory: 32GB DDR5\n"
+            "Storage: 512GB SSD"
+        ),
+        label_visibility="collapsed",
+    )
+
+compare_clicked = st.button(
+    "Compare Specifications",
+    type="primary",
+    use_container_width=True,
+)
+
+if compare_clicked:
+    source_specs = parse_specs(source_text)
+    live_specs = parse_specs(live_text)
+
+    if not source_specs:
+        st.session_state["comparison_results"] = None
+        st.warning(
+            "Enter at least one valid source specification using "
+            "`Checkpoint: Value`."
+        )
+    elif not live_specs:
+        st.session_state["comparison_results"] = None
+        st.warning(
+            "Enter at least one valid live specification using "
+            "`Checkpoint: Value`."
+        )
+    else:
+        st.session_state["comparison_results"] = compare_specs(
+            source_specs,
+            live_specs,
+        )
+
+comparison_results = st.session_state["comparison_results"]
+
+if comparison_results is not None:
+    summary = get_summary(comparison_results)
+    result_dataframe = pd.DataFrame(comparison_results)
+
+    overall_status = summary["overall_status"]
+
+    if overall_status == "PASS":
+        st.success(
+            "Overall Status: PASS - all specifications match."
+        )
+    elif overall_status == "FAIL":
+        st.error(
+            "Overall Status: FAIL - one or more specifications "
+            "do not match."
+        )
+    else:
+        st.info(
+            "Overall Status: NO DATA - no specifications were compared."
+        )
+
+    total_column, passed_column, failed_column, score_column = (
+        st.columns(4)
+    )
+
+    total_column.metric("Total", summary["total"])
+    passed_column.metric("Passed", summary["passed"])
+    failed_column.metric("Failed", summary["failed"])
+    score_column.metric(
+        "Score",
+        f"{summary['score']:.2f}%",
+    )
+
+    st.markdown("### Comparison Results")
+    st.dataframe(
+        result_dataframe,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    csv_data = result_dataframe.to_csv(
+        index=False,
+    ).encode("utf-8")
+
+    st.download_button(
+        label="Download Results as CSV",
+        data=csv_data,
+        file_name="results.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+st.markdown("---")
+st.subheader("Upload Source File")
+st.caption(
+    "Upload an Offer Readiness CSV or Excel file, "
+    "then select an Offer ID."
+)
+
+uploaded_file = st.file_uploader(
+    "Choose a source file",
+    type=["csv", "xlsx"],
+    help="Supported formats: CSV and XLSX.",
 )
 
 # ── Sidebar (placeholder) ──
@@ -84,3 +209,228 @@ with st.sidebar:
 
             if rule["notes"]:
                 st.info(rule["notes"])
+
+if uploaded_file is not None:
+    try:
+        uploaded_file.seek(0)
+
+        if uploaded_file.name.lower().endswith(".csv"):
+            uploaded_dataframe = pd.read_csv(uploaded_file)
+        else:
+            uploaded_dataframe = pd.read_excel(uploaded_file)
+
+    except Exception as error:
+        st.error(
+            f"Could not read the uploaded file: {error}"
+        )
+    else:
+        normalized_columns = {
+            "".join(
+                character
+                for character in str(column).casefold()
+                if character.isalnum()
+            ): column
+            for column in uploaded_dataframe.columns
+        }
+
+        offer_id_column = normalized_columns.get("offerid")
+
+        if offer_id_column is None:
+            st.error(
+                "The uploaded file does not contain an Offer ID column."
+            )
+            st.caption(
+                "Available columns: "
+                + ", ".join(
+                    str(column)
+                    for column in uploaded_dataframe.columns
+                )
+            )
+        else:
+            offer_ids = (
+                uploaded_dataframe[offer_id_column]
+                .dropna()
+                .astype(str)
+                .str.strip()
+            )
+            offer_ids = sorted(
+                offer_id
+                for offer_id in offer_ids.unique()
+                if offer_id
+            )
+
+            if not offer_ids:
+                st.warning(
+                    "The Offer ID column does not contain any values."
+                )
+            else:
+                selected_offer_id = st.selectbox(
+                    "Select an Offer ID",
+                    options=offer_ids,
+                )
+
+                st.success(
+                    f"Loaded {len(uploaded_dataframe)} rows and "
+                    f"found {len(offer_ids)} unique Offer IDs."
+                )
+
+
+                offer_id_values = (
+                    uploaded_dataframe[offer_id_column]
+                    .astype("string")
+                    .str.strip()
+                )
+
+                selected_offer_mask = (
+                    offer_id_values
+                    .eq(selected_offer_id)
+                    .fillna(False)
+                )
+
+                offer_dataframe = (
+                    uploaded_dataframe.loc[selected_offer_mask]
+                    .copy()
+                )
+
+                country_column = normalized_columns.get("country")
+                checkpoint_column = normalized_columns.get("checkpoint")
+                expected_column = normalized_columns.get(
+                    "expectedformatrule"
+                )
+
+                required_columns = {
+                    "Country": country_column,
+                    "Checkpoint": checkpoint_column,
+                    "Expected Format / Rule": expected_column,
+                }
+                missing_columns = [
+                    name
+                    for name, column in required_columns.items()
+                    if column is None
+                ]
+
+                if missing_columns:
+                    st.error(
+                        "The uploaded file is missing required columns: "
+                        + ", ".join(missing_columns)
+                    )
+                else:
+                    countries = (
+                        offer_dataframe[country_column]
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
+                    )
+                    countries = sorted(
+                        country
+                        for country in countries.unique()
+                        if country
+                    )
+
+                    if not countries:
+                        st.warning(
+                            "The selected Offer ID has no country values."
+                        )
+                    else:
+                        selected_country = st.selectbox(
+                            "Select a Country / Market",
+                            options=countries,
+                        )
+
+                        country_values = (
+                            offer_dataframe[country_column]
+                            .astype("string")
+                            .str.strip()
+                        )
+                        selected_country_mask = (
+                            country_values
+                            .eq(selected_country)
+                            .fillna(False)
+                        )
+
+                        filtered_offer_dataframe = (
+                            offer_dataframe.loc[
+                                selected_offer_mask
+                            ]
+                            .copy()
+                        )
+
+                        st.markdown("### Selected Offer Data")
+                        st.caption(
+                            f"Offer `{selected_offer_id}`in"
+                            f"`{selected_country}' contains "
+                            f"`{len(filtered_offer_dataframe)} row(s)."
+                        )
+                        st.dataframe(
+                            filtered_offer_dataframe,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                        uploaded_source_specs = {}
+
+                        for _, row in (
+                            filtered_offer_dataframe.iterrows()
+                        ):
+                            checkpoint = row[checkpoint_column]
+                            expected = row[expected_column]
+
+                            if (
+                                pd.isna(checkpoint)
+                                or pd.isna(expected)
+                            ):
+                                continue
+
+                            checkpoint = str(checkpoint).strip()
+                            expected = str(expected).strip()
+
+                            if checkpoint and expected:
+                                uploaded_source_specs[checkpoint] = (
+                                    expected
+                                )
+
+                        if not uploaded_source_specs:
+                            st.warning(
+                                "The selected offer and market have no "
+                                "complete Checkpoint and Expected Format "
+                                "/ Rule values to compare."
+                            )
+                        else:
+                            st.success(
+                                f"Extracted "
+                                f"{len(uploaded_source_specs)} source"
+                                f"specification(s)."
+                            )
+
+                            source_preview = pd.DataFrame(
+                                [
+                                    {
+                                        "checkpoint": checkpoint,
+                                        "expected": expected,
+                                    }
+                                    for checkpoint, expected
+                                    in uploaded_source_specs.items()
+                                ]
+                            )
+
+                            st.markdown(
+                                "### Extracted Source Specifications"
+                            )
+                            st.dataframe(
+                                source_preview,
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+
+                st.markdown("### Selected Offer Data")
+                st.caption(
+                    f"Offer `{selected_offer_id}` contains "
+                    f"{len(filtered_offer_dataframe)} row(s)."
+                )
+
+                st.dataframe(
+                    filtered_offer_dataframe,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
