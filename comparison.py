@@ -2,7 +2,6 @@
 Comparison Engine
 Compares source specs (Excel) against live specs (PDP page).
 """
-from jsonschema.benchmarks.const_vs_enum import value
 
 
 def normalize(value):

@@ -5,7 +5,6 @@ Run with: streamlit run app.py
 
 import pandas as pd
 import streamlit as st
-from setuptools import namespaces
 
 from comparison import compare_specs, get_summary, parse_specs
 from rules import get_all_rules, get_by_category
@@ -342,6 +341,7 @@ if uploaded_file is not None:
                             .astype("string")
                             .str.strip()
                         )
+
                         selected_country_mask = (
                             country_values
                             .eq(selected_country)
@@ -349,17 +349,15 @@ if uploaded_file is not None:
                         )
 
                         filtered_offer_dataframe = (
-                            offer_dataframe.loc[
-                                selected_offer_mask
-                            ]
+                            offer_dataframe.loc[selected_country_mask]
                             .copy()
                         )
 
                         st.markdown("### Selected Offer Data")
                         st.caption(
-                            f"Offer `{selected_offer_id}`in"
-                            f"`{selected_country}' contains "
-                            f"`{len(filtered_offer_dataframe)} row(s)."
+                            f"Offer `{selected_offer_id}` in "
+                            f"`{selected_country}` contains "
+                            f"{len(filtered_offer_dataframe)} row(s)."
                         )
                         st.dataframe(
                             filtered_offer_dataframe,
@@ -369,15 +367,13 @@ if uploaded_file is not None:
 
                         uploaded_source_specs = {}
 
-                        for _, row in (
-                            filtered_offer_dataframe.iterrows()
-                        ):
+                        for _, row in filtered_offer_dataframe.iterrows():
                             checkpoint = row[checkpoint_column]
                             expected = row[expected_column]
 
                             if (
-                                pd.isna(checkpoint)
-                                or pd.isna(expected)
+                                    pd.isna(checkpoint)
+                                    or pd.isna(expected)
                             ):
                                 continue
 
@@ -385,9 +381,7 @@ if uploaded_file is not None:
                             expected = str(expected).strip()
 
                             if checkpoint and expected:
-                                uploaded_source_specs[checkpoint] = (
-                                    expected
-                                )
+                                uploaded_source_specs[checkpoint] = expected
 
                         if not uploaded_source_specs:
                             st.warning(
@@ -398,8 +392,8 @@ if uploaded_file is not None:
                         else:
                             st.success(
                                 f"Extracted "
-                                f"{len(uploaded_source_specs)} source"
-                                f"specification(s)."
+                                f"{len(uploaded_source_specs)} "
+                                f"source specification(s)."
                             )
 
                             source_preview = pd.DataFrame(
@@ -421,16 +415,4 @@ if uploaded_file is not None:
                                 use_container_width=True,
                                 hide_index=True,
                             )
-
-                st.markdown("### Selected Offer Data")
-                st.caption(
-                    f"Offer `{selected_offer_id}` contains "
-                    f"{len(filtered_offer_dataframe)} row(s)."
-                )
-
-                st.dataframe(
-                    filtered_offer_dataframe,
-                    use_container_width=True,
-                    hide_index=True,
-                )
 
