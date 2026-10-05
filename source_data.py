@@ -4,14 +4,35 @@ Utilities for processing Offer Readiness source data.
 
 import pandas as pd
 
+
+def read_csv_with_fallback(uploaded_file):
+    """Read a CSV using encodings commonly found in audit exports."""
+    encodings = ("utf-8-sig", "cp1252")
+
+    for encoding in encodings:
+        try:
+            uploaded_file.seek(0)
+            return pd.read_csv(
+                uploaded_file,
+                encoding=encoding,
+            )
+
+        except UnicodeDecodeError:
+            continue
+
+    raise ValueError(
+        "The CSV encoding is not supported."
+    )
+
+
 def read_source_file(uploaded_file):
-    """Read an uploaded CSV or XLSX file into a Dataframe"""
+    """Read an uploaded CSV or XLSX file into a DataFrame."""
     file_name = uploaded_file.name.casefold()
 
     uploaded_file.seek(0)
 
     if file_name.endswith(".csv"):
-        return pd.read_csv(uploaded_file)
+        return read_csv_with_fallback(uploaded_file)
 
     if file_name.endswith(".xlsx"):
         return pd.read_excel(uploaded_file)
@@ -19,12 +40,6 @@ def read_source_file(uploaded_file):
     raise ValueError(
         "Unsupported file format. Use a CSV or XLSX file."
     )
-
-
-
-
-
-
 
 
 def detect_columns(dataframe):

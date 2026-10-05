@@ -1,6 +1,5 @@
-from io import BytesIO
-
 import unittest
+from io import BytesIO
 
 import pandas as pd
 
@@ -11,6 +10,7 @@ from source_data import (
     get_offer_ids,
     read_source_file,
 )
+
 
 class DetectColumnsTests(unittest.TestCase):
     def test_detects_required_columns(self):
@@ -63,6 +63,7 @@ class DetectColumnsTests(unittest.TestCase):
         self.assertIsNone(columns["checkpoint"])
         self.assertIsNone(columns["expected"])
 
+
 class UploadedFile(BytesIO):
     def __init__(self, content, name):
         super().__init__(content)
@@ -85,6 +86,22 @@ class ReadSourceFileTests(unittest.TestCase):
         self.assertEqual(
             result.iloc[0]["Offer ID"],
             "offer_1",
+        )
+
+    def test_reads_cp1252_csv_file(self):
+        uploaded_file = UploadedFile(
+            (
+                "Country,Offer ID,Checkpoint\n"
+                "hkg_market_EN,offer_1,Configuração\n"
+            ).encode("cp1252"),
+            "offers.csv",
+        )
+
+        result = read_source_file(uploaded_file)
+
+        self.assertEqual(
+            result.iloc[0]["Checkpoint"],
+            "Configuração",
         )
 
     def test_reads_xlsx_file(self):
@@ -134,6 +151,7 @@ class ReadSourceFileTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             read_source_file(uploaded_file)
+
 
 class GetOfferIdsTests(unittest.TestCase):
     def test_returns_sorted_unique_offer_ids(self):

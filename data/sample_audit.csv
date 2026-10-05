@@ -1,0 +1,5 @@
+Country,LOB,Platform,Model,Offer ID,Auditor,Checkpoint,Expected Format / Rule,Error Remarks,Audit Status
+hkg_market_ZH,Dell Pro Laptop,Dell Pro 7 14 P714265,P714265,p714265_reg_01,Sample Auditor,Graphics,Graphics line item present,Missing Graphics,Follow Up
+hkg_market_ZH,Dell Pro Laptop,Dell Pro 7 14 P714265,P714265,p714265_reg_01,Sample Auditor,Display option count,Only one display size should be shown,Multiple display sizes,Follow Up
+hkg_market_ZH,Dell Pro Laptop,Dell Pro 7 14 P714265,P714265,p714265_reg_01,Sample Auditor,Delivery date,Delivery date should not be in the past,Missing Delivery,Follow Up
+hkg_market_ZH,Dell Pro Laptop,Dell Pro 7 14 P714265,P714265,p714265_reg_01,Sample Auditor,Delivery date threshold,Working threshold = within 30 days,Missing Delivery,Follow Up

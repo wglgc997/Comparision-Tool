@@ -6,16 +6,22 @@ Run with: streamlit run app.py
 import pandas as pd
 import streamlit as st
 
-from comparison import compare_specs, get_summary, parse_specs
+from comparison import (
+    compare_specs,
+    get_summary,
+    parse_specs,
+)
+from pdp_parser import analyze_pdp_content, get_audit_summary
 from rules import get_all_rules, get_by_category
 from source_data import (
     detect_columns,
     extract_source_specs,
     filter_offer_rows,
     get_offer_ids,
+    read_source_file,
 )
 
-#Page config
+# Page configuration
 st.set_page_config(
     page_title="Offer Readiness QA Tool",
     page_icon="🔍",
@@ -25,15 +31,15 @@ st.set_page_config(
 if "comparison_results" not in st.session_state:
     st.session_state["comparison_results"] = None
 
-#Header
+# Header
 st.title("🔍 Offer Readiness QA Tool")
 st.markdown(
-    "Compare Source data(Excel/CSV) against"
-    "live PDP page specs"
+    "Compare source data (Excel/CSV) against "
+    "live PDP page specifications."
 )
 st.markdown("___")
 
-# ── Main Area (placeholder) ──
+# Manual comparison
 st.subheader("Manual Spec Comparison")
 st.caption(
     "Enter one specification per line using the format "
@@ -139,7 +145,7 @@ if comparison_results is not None:
 
     csv_data = result_dataframe.to_csv(
         index=False,
-    ).encode("utf-8")
+    ).encode("utf-8-sig")
 
     st.download_button(
         label="Download Results as CSV",
@@ -162,12 +168,8 @@ uploaded_file = st.file_uploader(
     help="Supported formats: CSV and XLSX.",
 )
 
-# ── Sidebar (placeholder) ──
+# Validation-rule reference
 with st.sidebar:
-    st.header("Settings")
-    st.markdown("Mode and additional filters will go here.")
-    st.markdown("---")
-
     st.header("Validation Rules")
 
     all_rules = get_all_rules()
@@ -182,10 +184,19 @@ with st.sidebar:
 
     filtered_rules = get_by_category(selected_category)
 
-    st.metric("Total Rules", len(all_rules))
+    documented_rule_count = sum(
+        rule["status"] == "documented"
+        for rule in all_rules
+    )
+
+    st.metric("Documented Rules", documented_rule_count)
     st.caption(
         f"Showing {len(filtered_rules)} rule(s) "
         f"in {selected_category}"
+    )
+    st.caption(
+        "Rules without complete definitions are shown for reference "
+        "and are not evaluated automatically."
     )
 
     for rule in filtered_rules:
@@ -217,17 +228,12 @@ with st.sidebar:
 
 if uploaded_file is not None:
     try:
-        uploaded_file.seek(0)
-
-        if uploaded_file.name.lower().endswith(".csv"):
-            uploaded_dataframe = pd.read_csv(uploaded_file)
-        else:
-            uploaded_dataframe = pd.read_excel(uploaded_file)
-
+        uploaded_dataframe = read_source_file(uploaded_file)
     except Exception as error:
         st.error(
             f"Could not read the uploaded file: {error}"
         )
+
     else:
         source_columns = detect_columns(uploaded_dataframe)
         offer_id_column = source_columns["offer_id"]
@@ -372,3 +378,120 @@ if uploaded_file is not None:
                                 use_container_width=True,
                                 hide_index=True,
                             )
+
+                            uploaded_live_text = st.text_area(
+                                "Content copied from the live PDP",
+                                height=250,
+                                placeholder=(
+                                    "Dell Pro 7 Series 14 Laptop\n"
+                                    "AMD Ryzen AI 5 PRO 435, 6 Cores\n"
+                                    "Windows 11 Pro\n"
+                                    "16 GB DDR5\n"
+                                    "14\" Non Touch FHD (1920x1200)"
+                                ),
+                            )
+                            st.caption(
+                                "Copy the visible product content from the "
+                                "Dell page and paste it here. Supported "
+                                "checkpoints are evaluated automatically; "
+                                "the others are marked REVIEW."
+                            )
+
+                            compare_uploaded_clicked = st.button(
+                                "Compare Uploaded Offer",
+                                type="primary",
+                                use_container_width=True,
+                            )
+
+                            if compare_uploaded_clicked:
+                                if not uploaded_live_text.strip():
+                                    st.warning(
+                                        "Paste the content copied from the "
+                                        "live PDP before comparing."
+                                    )
+                                else:
+                                    uploaded_results = analyze_pdp_content(
+                                        uploaded_source_specs,
+                                        uploaded_live_text,
+                                    )
+                                    uploaded_summary = get_audit_summary(
+                                        uploaded_results
+                                    )
+                                    uploaded_result_dataframe = pd.DataFrame(
+                                        uploaded_results
+                                    )
+
+                                    if (
+                                        uploaded_summary["overall_status"]
+                                        == "PASS"
+                                    ):
+                                        st.success(
+                                            "Overall Status: PASS - all "
+                                            "checkpoints passed."
+                                        )
+                                    else:
+                                        if (
+                                            uploaded_summary["overall_status"]
+                                            == "REVIEW"
+                                        ):
+                                            st.warning(
+                                                "Overall Status: REVIEW - "
+                                                "manual review is required."
+                                            )
+                                        else:
+                                            st.error(
+                                                "Overall Status: FAIL - one "
+                                                "or more checkpoints failed."
+                                            )
+
+                                    (
+                                        total_column,
+                                        passed_column,
+                                        failed_column,
+                                        review_column,
+                                        score_column,
+                                    ) = st.columns(5)
+
+                                    total_column.metric(
+                                        "Total",
+                                        uploaded_summary["total"],
+                                    )
+                                    passed_column.metric(
+                                        "Passed",
+                                        uploaded_summary["passed"],
+                                    )
+                                    failed_column.metric(
+                                        "Failed",
+                                        uploaded_summary["failed"],
+                                    )
+                                    review_column.metric(
+                                        "Review",
+                                        uploaded_summary["review"],
+                                    )
+                                    score_column.metric(
+                                        "Score",
+                                        f"{uploaded_summary['score']:.2f}%",
+                                    )
+
+                                    st.dataframe(
+                                        uploaded_result_dataframe,
+                                        use_container_width=True,
+                                        hide_index=True,
+                                    )
+
+                                    uploaded_csv_result = (
+                                        uploaded_result_dataframe
+                                        .to_csv(index=False)
+                                        .encode("utf-8-sig")
+                                    )
+
+                                    st.download_button(
+                                        "Download Uploaded Offer Results",
+                                        data=uploaded_csv_result,
+                                        file_name=(
+                                            f"{selected_offer_id}_"
+                                            f"{selected_country}_results.csv"
+                                        ),
+                                        mime="text/csv",
+                                        use_container_width=True,
+                                    )

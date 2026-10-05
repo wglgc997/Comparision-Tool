@@ -1,10 +1,11 @@
 import unittest
 
 from comparison import (
-compare_specs,
-get_summary,
-normalize,
-parse_specs
+    compare_audit_results,
+    compare_specs,
+    get_summary,
+    normalize,
+    parse_specs,
 )
 
 
@@ -61,6 +62,46 @@ class CompareSpecsTests(unittest.TestCase):
 
     def test_empty_source_returns_no_results(self):
         self.assertEqual(compare_specs({}, {}), [])
+
+
+class CompareAuditResultsTests(unittest.TestCase):
+    def test_uses_explicit_outcomes_with_evidence(self):
+        source_rules = {
+            "Graphics": "Graphics line item present",
+            "Display option count": "Only one display size should be shown",
+        }
+        observations = {
+            "Graphics": "FAIL - Missing from specs",
+            "Display option count": "PASS - One display line shown",
+        }
+
+        results = compare_audit_results(source_rules, observations)
+
+        self.assertEqual(
+            [result["status"] for result in results],
+            ["FAIL", "PASS"],
+        )
+        self.assertEqual(
+            results[0]["actual"],
+            "FAIL - Missing from specs",
+        )
+
+    def test_missing_observation_fails(self):
+        results = compare_audit_results(
+            {"Delivery date": "Delivery date should not be in the past"},
+            {},
+        )
+
+        self.assertEqual(results[0]["status"], "FAIL")
+
+    def test_exact_match_remains_supported(self):
+        results = compare_audit_results(
+            {"Graphics": "Graphics line item present"},
+            {"Graphics": "graphics line item present"},
+        )
+
+        self.assertEqual(results[0]["status"], "PASS")
+
 
 class ParseSpecsTests(unittest.TestCase):
     def test_parses_checkpoint_value_lines(self):
