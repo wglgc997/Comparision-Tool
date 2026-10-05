@@ -1,3 +1,5 @@
+from io import BytesIO
+
 import unittest
 
 import pandas as pd
@@ -7,8 +9,8 @@ from source_data import (
     extract_source_specs,
     filter_offer_rows,
     get_offer_ids,
+    read_source_file,
 )
-
 
 class DetectColumnsTests(unittest.TestCase):
     def test_detects_required_columns(self):
@@ -61,6 +63,77 @@ class DetectColumnsTests(unittest.TestCase):
         self.assertIsNone(columns["checkpoint"])
         self.assertIsNone(columns["expected"])
 
+class UploadedFile(BytesIO):
+    def __init__(self, content, name):
+        super().__init__(content)
+        self.name = name
+
+
+class ReadSourceFileTests(unittest.TestCase):
+    def test_reads_csv_file(self):
+        uploaded_file = UploadedFile(
+            (
+                b"Country,Offer ID,Checkpoint\n"
+                b"hkg_market_EN,offer_1,Processor\n"
+            ),
+            "offers.csv",
+        )
+
+        result = read_source_file(uploaded_file)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(
+            result.iloc[0]["Offer ID"],
+            "offer_1",
+        )
+
+    def test_reads_xlsx_file(self):
+        source_dataframe = pd.DataFrame(
+            {
+                "Country": ["hkg_market_EN"],
+                "Offer ID": ["offer_1"],
+                "Checkpoint": ["Processor"],
+            }
+        )
+
+        excel_content = BytesIO()
+        source_dataframe.to_excel(
+            excel_content,
+            index=False,
+        )
+
+        uploaded_file = UploadedFile(
+            excel_content.getvalue(),
+            "offers.xlsx",
+        )
+
+        result = read_source_file(uploaded_file)
+
+        pd.testing.assert_frame_equal(
+            result,
+            source_dataframe,
+        )
+
+    def test_rejects_unsupported_file_format(self):
+        uploaded_file = UploadedFile(
+            b"invalid content",
+            "offers.txt",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Unsupported file format",
+        ):
+            read_source_file(uploaded_file)
+
+    def test_rejects_invalid_xlsx_content(self):
+        uploaded_file = UploadedFile(
+            b"invalid Excel content",
+            "offers.xlsx",
+        )
+
+        with self.assertRaises(ValueError):
+            read_source_file(uploaded_file)
 
 class GetOfferIdsTests(unittest.TestCase):
     def test_returns_sorted_unique_offer_ids(self):

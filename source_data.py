@@ -4,6 +4,28 @@ Utilities for processing Offer Readiness source data.
 
 import pandas as pd
 
+def read_source_file(uploaded_file):
+    """Read an uploaded CSV or XLSX file into a Dataframe"""
+    file_name = uploaded_file.name.casefold()
+
+    uploaded_file.seek(0)
+
+    if file_name.endswith(".csv"):
+        return pd.read_csv(uploaded_file)
+
+    if file_name.endswith(".xlsx"):
+        return pd.read_excel(uploaded_file)
+
+    raise ValueError(
+        "Unsupported file format. Use a CSV or XLSX file."
+    )
+
+
+
+
+
+
+
 
 def detect_columns(dataframe):
     """Find required source columns, ignoring spaces and case."""

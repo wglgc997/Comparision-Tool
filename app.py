@@ -8,6 +8,12 @@ import streamlit as st
 
 from comparison import compare_specs, get_summary, parse_specs
 from rules import get_all_rules, get_by_category
+from source_data import (
+    detect_columns,
+    extract_source_specs,
+    filter_offer_rows,
+    get_offer_ids,
+)
 
 #Page config
 st.set_page_config(
@@ -223,16 +229,8 @@ if uploaded_file is not None:
             f"Could not read the uploaded file: {error}"
         )
     else:
-        normalized_columns = {
-            "".join(
-                character
-                for character in str(column).casefold()
-                if character.isalnum()
-            ): column
-            for column in uploaded_dataframe.columns
-        }
-
-        offer_id_column = normalized_columns.get("offerid")
+        source_columns = detect_columns(uploaded_dataframe)
+        offer_id_column = source_columns["offer_id"]
 
         if offer_id_column is None:
             st.error(
@@ -246,16 +244,9 @@ if uploaded_file is not None:
                 )
             )
         else:
-            offer_ids = (
-                uploaded_dataframe[offer_id_column]
-                .dropna()
-                .astype(str)
-                .str.strip()
-            )
-            offer_ids = sorted(
-                offer_id
-                for offer_id in offer_ids.unique()
-                if offer_id
+            offer_ids = get_offer_ids(
+                uploaded_dataframe,
+                offer_id_column,
             )
 
             if not offer_ids:
@@ -274,28 +265,15 @@ if uploaded_file is not None:
                 )
 
 
-                offer_id_values = (
-                    uploaded_dataframe[offer_id_column]
-                    .astype("string")
-                    .str.strip()
+                offer_dataframe = filter_offer_rows(
+                    uploaded_dataframe,
+                    offer_id_column,
+                    selected_offer_id,
                 )
 
-                selected_offer_mask = (
-                    offer_id_values
-                    .eq(selected_offer_id)
-                    .fillna(False)
-                )
-
-                offer_dataframe = (
-                    uploaded_dataframe.loc[selected_offer_mask]
-                    .copy()
-                )
-
-                country_column = normalized_columns.get("country")
-                checkpoint_column = normalized_columns.get("checkpoint")
-                expected_column = normalized_columns.get(
-                    "expectedformatrule"
-                )
+                country_column = source_columns["country"]
+                checkpoint_column = source_columns["checkpoint"]
+                expected_column = source_columns["expected"]
 
                 required_columns = {
                     "Country": country_column,
@@ -336,21 +314,12 @@ if uploaded_file is not None:
                             options=countries,
                         )
 
-                        country_values = (
-                            offer_dataframe[country_column]
-                            .astype("string")
-                            .str.strip()
-                        )
-
-                        selected_country_mask = (
-                            country_values
-                            .eq(selected_country)
-                            .fillna(False)
-                        )
-
-                        filtered_offer_dataframe = (
-                            offer_dataframe.loc[selected_country_mask]
-                            .copy()
+                        filtered_offer_dataframe = filter_offer_rows(
+                            uploaded_dataframe,
+                            offer_id_column,
+                            selected_offer_id,
+                            country_column,
+                            selected_country,
                         )
 
                         st.markdown("### Selected Offer Data")
@@ -365,23 +334,11 @@ if uploaded_file is not None:
                             hide_index=True,
                         )
 
-                        uploaded_source_specs = {}
-
-                        for _, row in filtered_offer_dataframe.iterrows():
-                            checkpoint = row[checkpoint_column]
-                            expected = row[expected_column]
-
-                            if (
-                                    pd.isna(checkpoint)
-                                    or pd.isna(expected)
-                            ):
-                                continue
-
-                            checkpoint = str(checkpoint).strip()
-                            expected = str(expected).strip()
-
-                            if checkpoint and expected:
-                                uploaded_source_specs[checkpoint] = expected
+                        uploaded_source_specs = extract_source_specs(
+                            filtered_offer_dataframe,
+                            checkpoint_column,
+                            expected_column,
+                        )
 
                         if not uploaded_source_specs:
                             st.warning(
@@ -415,4 +372,3 @@ if uploaded_file is not None:
                                 use_container_width=True,
                                 hide_index=True,
                             )
-
