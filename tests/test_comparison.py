@@ -1,6 +1,12 @@
 import unittest
 
-from comparison import compare_specs, get_summary, normalize
+from comparison import (
+    compare_audit_results,
+    compare_specs,
+    get_summary,
+    normalize,
+    parse_specs,
+)
 
 
 class NormalizeTests(unittest.TestCase):
@@ -57,6 +63,89 @@ class CompareSpecsTests(unittest.TestCase):
     def test_empty_source_returns_no_results(self):
         self.assertEqual(compare_specs({}, {}), [])
 
+
+class CompareAuditResultsTests(unittest.TestCase):
+    def test_uses_explicit_outcomes_with_evidence(self):
+        source_rules = {
+            "Graphics": "Graphics line item present",
+            "Display option count": "Only one display size should be shown",
+        }
+        observations = {
+            "Graphics": "FAIL - Missing from specs",
+            "Display option count": "PASS - One display line shown",
+        }
+
+        results = compare_audit_results(source_rules, observations)
+
+        self.assertEqual(
+            [result["status"] for result in results],
+            ["FAIL", "PASS"],
+        )
+        self.assertEqual(
+            results[0]["actual"],
+            "FAIL - Missing from specs",
+        )
+
+    def test_missing_observation_fails(self):
+        results = compare_audit_results(
+            {"Delivery date": "Delivery date should not be in the past"},
+            {},
+        )
+
+        self.assertEqual(results[0]["status"], "FAIL")
+
+    def test_exact_match_remains_supported(self):
+        results = compare_audit_results(
+            {"Graphics": "Graphics line item present"},
+            {"Graphics": "graphics line item present"},
+        )
+
+        self.assertEqual(results[0]["status"], "PASS")
+
+
+class ParseSpecsTests(unittest.TestCase):
+    def test_parses_checkpoint_value_lines(self):
+        text = (
+            "Processor: Intel Core Ultra 7\n"
+            "Memory: 16GB DDR5\n"
+            "Storage: 512GB SSD"
+        )
+
+        self.assertEqual(
+            parse_specs(text),
+            {
+                "Processor": "Intel Core Ultra 7",
+                "Memory": "16GB DDR5",
+                "Storage": "512GB SSD",
+            },
+        )
+
+    def test_preserves_colons_inside_values(self):
+        self.assertEqual(
+            parse_specs("Delivery: Estimated date: October 15"),
+            {
+                "Delivery": "Estimated date: October 15",
+            },
+        )
+
+    def test_ignores_blank_and_malformed_lines(self):
+        text = (
+            "\n"
+            "Invalid line\n"
+            ": Missing checkpoint\n"
+            "Display: 14-inch FHD\n"
+        )
+
+        self.assertEqual(
+            parse_specs(text),
+            {
+                "Display": "14-inch FHD",
+            },
+        )
+
+    def test_empty_input_returns_empty_dictionary(self):
+        self.assertEqual(parse_specs(""), {})
+        self.assertEqual(parse_specs(None), {})
 
 class SummaryTests(unittest.TestCase):
     def test_summarizes_mixed_results(self):

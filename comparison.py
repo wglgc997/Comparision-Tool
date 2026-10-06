@@ -29,6 +29,35 @@ def normalize(value):
     return normalized
 
 
+def parse_specs(text):
+    """
+    Parse lines in 'Checkpoint: Value' format into a dictionary.
+
+    Blank lines, lines without a colon, and lines without a checkpoint name
+    are ignored. Only the first colon separates the checkpoint from its value.
+    """
+    if not text:
+        return {}
+
+    specs = {}
+
+    for line in text.splitlines():
+        stripped_line = line.strip()
+
+        if not stripped_line or ":" not in stripped_line:
+            continue
+
+        checkpoint, value = stripped_line.split(":", 1)
+        checkpoint = checkpoint.strip()
+
+        if not checkpoint:
+            continue
+
+        specs[checkpoint] = value.strip()
+
+    return specs
+
+
 def compare_specs(source_specs, live_specs):
     """
     Compare source specifications against live PDP specifications.
@@ -62,6 +91,53 @@ def compare_specs(source_specs, live_specs):
     return results
 
 
+def compare_audit_results(source_rules, live_observations):
+    """Evaluate audit rules using explicit PASS/FAIL observations."""
+    normalized_observations = {
+        normalize(field): value
+        for field, value in live_observations.items()
+    }
+
+    results = []
+
+    for checkpoint, expected in source_rules.items():
+        actual = normalized_observations.get(normalize(checkpoint), "")
+        normalized_actual = normalize(actual)
+
+        if _starts_with_outcome(normalized_actual, "pass"):
+            status = "PASS"
+        elif _starts_with_outcome(normalized_actual, "fail"):
+            status = "FAIL"
+        else:
+            status = (
+                "PASS"
+                if normalize(expected) == normalized_actual
+                else "FAIL"
+            )
+
+        results.append(
+            {
+                "checkpoint": checkpoint,
+                "expected": expected,
+                "actual": actual,
+                "status": status,
+            }
+        )
+
+    return results
+
+
+def _starts_with_outcome(value, outcome):
+    """Return whether a normalized observation starts with an outcome."""
+    if value == outcome:
+        return True
+
+    return any(
+        value.startswith(f"{outcome}{separator}")
+        for separator in (":", " -", " —", " |")
+    )
+
+
 def get_summary(results):
     """
     Summarize comparison results.
@@ -82,7 +158,7 @@ def get_summary(results):
     ) if total else 0.0
 
     if total == 0:
-        overall_status ="NO DATA"
+        overall_status = "NO DATA"
     elif failed == 0:
         overall_status = "PASS"
     else:
